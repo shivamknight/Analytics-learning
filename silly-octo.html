@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Don't Let Them Turn On!</title>
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Arial,sans-serif;
+}
+
+body{
+    background:#1f1f1f;
+    color:white;
+    height:100vh;
+    overflow:hidden;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+}
+
+#scoreBoard{
+    position:absolute;
+    top:20px;
+    left:20px;
+    font-size:24px;
+    font-weight:bold;
+}
+
+#difficulty{
+    position:absolute;
+    top:20px;
+    right:20px;
+    width:180px;
+    height:18px;
+    border:2px solid white;
+    border-radius:20px;
+    overflow:hidden;
+}
+
+#difficultyFill{
+    height:100%;
+    width:20%;
+    background:lime;
+    transition:.4s;
+}
+
+#gameArea{
+    position:relative;
+    width:500px;
+    height:500px;
+}
+
+#box{
+    position:absolute;
+    width:220px;
+    height:220px;
+    background:#000;
+    border-radius:20px;
+    left:50%;
+    top:50%;
+    transform:translate(-50%,-50%);
+    overflow:visible;
+}
+
+#lid{
+    position:absolute;
+    width:220px;
+    height:20px;
+    background:#444;
+    top:-10px;
+    left:0;
+    transform-origin:left center;
+    transition:1s;
+}
+
+#octopus{
+    position:absolute;
+    font-size:80px;
+    left:50%;
+    top:50%;
+    transform:translate(-50%,-50%);
+    user-select:none;
+}
+
+.switch{
+    position:absolute;
+    width:60px;
+    height:60px;
+    border-radius:50%;
+    border:none;
+    cursor:pointer;
+    font-size:24px;
+    transition:.2s;
+}
+
+.switch:hover{
+    transform:scale(1.1);
+}
+
+.off{
+    background:#555;
+}
+
+.on{
+    background:#ff4444;
+    box-shadow:0 0 20px red;
+}
+
+.tentacle{
+    position:absolute;
+    height:8px;
+    background:#4cff4c;
+    transform-origin:left center;
+    border-radius:10px;
+    display:none;
+}
+
+#gameOver{
+    position:absolute;
+    inset:0;
+    background:rgba(0,0,0,.92);
+    display:none;
+    justify-content:center;
+    align-items:center;
+    flex-direction:column;
+    z-index:100;
+}
+
+#gameOver h1{
+    font-size:60px;
+    margin-bottom:20px;
+}
+
+#gameOver p{
+    font-size:28px;
+    margin-bottom:20px;
+}
+
+#restartBtn{
+    padding:15px 30px;
+    border:none;
+    border-radius:10px;
+    cursor:pointer;
+    font-size:20px;
+}
+
+@media(max-width:600px){
+
+#gameArea{
+    transform:scale(.75);
+}
+
+}
+</style>
+</head>
+<body>
+
+<div id="scoreBoard">Score: 0</div>
+
+<div id="difficulty">
+    <div id="difficultyFill"></div>
+</div>
+
+<div id="gameArea">
+
+    <div id="box">
+        <div id="lid"></div>
+        <div id="octopus">🐙</div>
+    </div>
+
+    <div class="tentacle" id="tentacle"></div>
+
+</div>
+
+<div id="gameOver">
+    <h1>GAME OVER</h1>
+    <p id="finalScore"></p>
+    <button id="restartBtn">Restart</button>
+</div>
+
+<script>
+
+const gameArea = document.getElementById("gameArea");
+const box = document.getElementById("box");
+const tentacle = document.getElementById("tentacle");
+const scoreBoard = document.getElementById("scoreBoard");
+const difficultyFill = document.getElementById("difficultyFill");
+
+const totalSwitches = 6;
+
+let score = 0;
+let spawnSpeed = 1500;
+let gameRunning = true;
+let switches = [];
+
+const positions = [
+    {x:220,y:20},
+    {x:60,y:120},
+    {x:380,y:120},
+    {x:60,y:340},
+    {x:380,y:340},
+    {x:220,y:440}
+];
+
+function createSwitches(){
+
+    positions.forEach((p,i)=>{
+
+        const btn = document.createElement("button");
+
+        btn.className = "switch off";
+        btn.innerHTML = "⭘";
+
+        btn.style.left = p.x + "px";
+        btn.style.top = p.y + "px";
+
+        btn.onclick = () => turnOff(btn);
+
+        gameArea.appendChild(btn);
+
+        switches.push(btn);
+
+    });
+}
+
+function randomOffSwitch(){
+
+    const offSwitches = switches.filter(
+        s => !s.classList.contains("on")
+    );
+
+    if(offSwitches.length===0) return;
+
+    const selected =
+        offSwitches[
+            Math.floor(Math.random()*offSwitches.length)
+        ];
+
+    selected.classList.remove("off");
+    selected.classList.add("on");
+    selected.innerHTML = "🔴";
+
+    checkGameOver();
+}
+
+function turnOff(btn){
+
+    if(!gameRunning) return;
+
+    if(btn.classList.contains("on")){
+
+        btn.classList.remove("on");
+        btn.classList.add("off");
+        btn.innerHTML="⭘";
+
+        score++;
+
+        scoreBoard.innerText =
+        "Score: " + score;
+
+        showTentacle(btn);
+
+        if(score % 10 === 0){
+
+            spawnSpeed =
+            Math.max(400, spawnSpeed - 150);
+
+            let level =
+            100 - ((spawnSpeed-400)/1100)*100;
+
+            difficultyFill.style.width =
+            level + "%";
+        }
+
+        setTimeout(()=>{
+            if(gameRunning){
+                activateSpecific(btn);
+            }
+        },700);
+    }
+}
+
+function activateSpecific(btn){
+
+    btn.classList.remove("off");
+    btn.classList.add("on");
+    btn.innerHTML="🔴";
+
+    checkGameOver();
+}
+
+function showTentacle(btn){
+
+    const boxRect =
+    box.getBoundingClientRect();
+
+    const btnRect =
+    btn.getBoundingClientRect();
+
+    const gameRect =
+    gameArea.getBoundingClientRect();
+
+    const startX =
+    boxRect.left + boxRect.width/2 - gameRect.left;
+
+    const startY =
+    boxRect.top + boxRect.height/2 - gameRect.top;
+
+    const endX =
+    btnRect.left + btnRect.width/2 - gameRect.left;
+
+    const endY =
+    btnRect.top + btnRect.height/2 - gameRect.top;
+
+    const dx=endX-startX;
+    const dy=endY-startY;
+
+    const length=
+    Math.sqrt(dx*dx+dy*dy);
+
+    const angle=
+    Math.atan2(dy,dx)*180/Math.PI;
+
+    tentacle.style.display="block";
+    tentacle.style.left=startX+"px";
+    tentacle.style.top=startY+"px";
+    tentacle.style.width=length+"px";
+    tentacle.style.transform=
+    `rotate(${angle}deg)`;
+
+    setTimeout(()=>{
+        tentacle.style.display="none";
+    },500);
+}
+
+function checkGameOver(){
+
+    const onCount =
+    switches.filter(
+        s=>s.classList.contains("on")
+    ).length;
+
+    if(onCount===totalSwitches){
+
+        gameRunning=false;
+
+        document.getElementById("lid")
+        .style.transform="rotate(-120deg)";
+
+        document.getElementById("octopus")
+        .style.fontSize="180px";
+
+        setTimeout(()=>{
+
+            document.getElementById("gameOver")
+            .style.display="flex";
+
+            document.getElementById("finalScore")
+            .innerText =
+            "Final Score: " + score;
+
+        },800);
+    }
+}
+
+function autoSpawner(){
+
+    if(!gameRunning) return;
+
+    randomOffSwitch();
+
+    setTimeout(autoSpawner,spawnSpeed);
+}
+
+document.getElementById("restartBtn")
+.onclick=()=>location.reload();
+
+createSwitches();
+
+randomOffSwitch();
+
+setTimeout(autoSpawner,spawnSpeed);
+
+</script>
+
+</body>
+</html>
